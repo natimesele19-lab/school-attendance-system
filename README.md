@@ -1,0 +1,49 @@
+# School Staff Biometric Attendance
+
+Mobile-first attendance management for two assigned portals only: **School Admin** and **Portal Admin**. The app uses Next.js 14 App Router, Tailwind CSS, Supabase Auth, and Supabase Postgres with row-level security.
+
+## Local setup
+
+1. Install Node.js 18.17 or later and run `npm install`.
+2. Create a Supabase project and apply [`supabase/migrations/001_attendance_platform.sql`](./supabase/migrations/001_attendance_platform.sql) using the Supabase SQL editor or CLI.
+3. Copy `.env.example` to `.env.local` and set the project URL and anon key.
+4. Create user accounts in Supabase Auth. There is no public sign-up.
+5. As a trusted project owner, assign each account a role and school in `public.user_roles`. A School Admin must be assigned a school; a Portal Admin must have `school_id = null`. For example:
+
+   ```sql
+   insert into public.schools (name) values ('Yeka D.M.K.M Primary & Middle School');
+
+   insert into public.user_roles (user_id, role, school_id)
+   values (
+     'AUTH_USER_UUID',
+     'school_admin',
+     (select id from public.schools where name = 'Yeka D.M.K.M Primary & Middle School')
+   );
+
+   -- For a platform administrator:
+   insert into public.user_roles (user_id, role, school_id)
+   values ('AUTH_USER_UUID', 'portal_admin', null);
+   ```
+
+   Do not expose Supabase service-role keys in this app or browser. Account provisioning and school/role assignment should only be performed by trusted operators.
+
+6. Start the application with `npm run dev`; verify with `npm run typecheck` and `npm run build`.
+
+## Included functionality
+
+- School Admin: staff registration, weekly Monday–Friday register, daily totals, manual attendance status updates, CSV export, print-ready A4 report and touch-friendly scanner simulator.
+- Portal Admin: school and staff totals, scanner device health, recent hardware logs and platform status.
+- Ethiopian calendar labels and Ethiopian clock conversion use the native `Intl.DateTimeFormat` API and Africa/Addis_Ababa time.
+- All server data access uses the authenticated Supabase client and database RLS. API responses are school-scoped; portal-wide APIs require the Portal Admin role.
+
+## Biometric hardware note
+
+The included scanner dialog is explicitly a UI simulator: it only sets `signature_verified` for a test attendance record and does not capture, transmit, or store a fingerprint. Real biometric enrollment and device health reporting require an approved vendor/device integration and a trusted device-side service. Keep raw biometric templates on certified hardware; do not place raw biometric data in browser storage or send it to these web endpoints.
+
+## Next.js security status
+
+This project is pinned to the requested Next.js 14 line (`14.2.35`). The current dependency audit reports a critical advisory affecting this version, and npm does not offer a fixed Next.js 14 release. Do not deploy this version to an internet-facing production environment until the framework is upgraded to a patched major release or an authorized security exception is accepted. The PostCSS-related advisories are addressed with compatible dependency overrides.
+
+## Database and calendar formats
+
+`attendance_records.date` stores a zero-padded Ethiopian calendar key (`YYYY-MM-DD`), and the unique staff/date constraint makes retries idempotent. `day_of_week` stores one of the five Amharic weekday names. The scanner and platform health tables are provisioned by the migration; hardware agents should report via a separately authenticated service endpoint using a server-only credential.
