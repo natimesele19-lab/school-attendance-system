@@ -65,7 +65,7 @@ export default function LoginPage() {
           <p className="ethiopic text-sm font-semibold text-forest">ደህንነቱ የተጠበቀ መግቢያ</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink">Welcome back</h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">Sign in with your assigned school or platform administrator account.</p>
-          {queryError && <p role="alert" className="mt-5 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{queryError === "assignment" ? "Your School Admin account does not have a school assignment yet." : "This account is not assigned to either supported portal."}</p>}
+          {queryError && <p role="alert" className="mt-5 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{queryError === "assignment" ? "Your School Admin account does not have a school assignment yet." : queryError === "lookup" ? "We could not verify your account role. Please try again or contact your system administrator." : "This account is not assigned to either supported portal."}</p>}
           {!configured && <p role="alert" className="mt-5 rounded-xl bg-amber-50 p-3 text-sm leading-6 text-amber-800">Supabase is not configured. Copy <code>.env.example</code> to <code>.env.local</code>, add your project URL and anon key, then restart.</p>}
           <form className="mt-8 space-y-5" onSubmit={signIn}>
             <label className="block text-sm font-medium text-slate-700">Email address

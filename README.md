@@ -5,10 +5,10 @@ Mobile-first attendance management for two assigned portals only: **School Admin
 ## Local setup
 
 1. Install Node.js 18.17 or later and run `npm install`.
-2. Create a Supabase project and apply [`supabase/migrations/001_attendance_platform.sql`](./supabase/migrations/001_attendance_platform.sql) using the Supabase SQL editor or CLI.
+2. Create a Supabase project and apply the SQL migrations in [`supabase/migrations`](./supabase/migrations) in filename order using the Supabase SQL editor or CLI.
 3. Copy `.env.example` to `.env.local` and set the project URL and anon key.
 4. Create user accounts in Supabase Auth. There is no public sign-up.
-5. As a trusted project owner, assign each account a role and school in `public.user_roles`. A School Admin must be assigned a school; a Portal Admin must have `school_id = null`. For example:
+5. As a trusted project owner, assign each account a role and school in `public.user_roles`. Migration 003 mirrors that role to `public.profiles`, which the app uses for portal access. A School Admin must be assigned a school; a Portal Admin must have `school_id = null`. For example:
 
    ```sql
    insert into public.schools (name) values ('Yeka D.M.K.M Primary & Middle School');

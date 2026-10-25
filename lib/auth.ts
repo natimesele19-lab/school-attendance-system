@@ -16,26 +16,38 @@ export async function getPortalContext(): Promise<PortalContext | NextResponse> 
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
-  const { data: roleRow, error } = await supabase
-    .from("user_roles")
-    .select("role, school_id")
-    .eq("user_id", user.id)
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
     .maybeSingle();
-  if (error) {
+  if (profileError) {
     return NextResponse.json({ error: "Unable to verify portal access." }, { status: 500 });
   }
-  if (!roleRow || (roleRow.role !== "school_admin" && roleRow.role !== "portal_admin")) {
+  if (!profile || (profile.role !== "school_admin" && profile.role !== "portal_admin")) {
     return NextResponse.json({ error: "This account is not assigned to an available portal." }, { status: 403 });
   }
-  if (roleRow.role === "school_admin" && !roleRow.school_id) {
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("user_roles")
+    .select("school_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (assignmentError) {
+    return NextResponse.json({ error: "Unable to verify portal access." }, { status: 500 });
+  }
+  if (!assignment) {
+    return NextResponse.json({ error: "This account is not assigned to an available portal." }, { status: 403 });
+  }
+  if (profile.role === "school_admin" && !assignment.school_id) {
     return NextResponse.json({ error: "This School Admin account has no school assigned." }, { status: 403 });
   }
 
   return {
     supabase,
     userId: user.id,
-    role: roleRow.role as PortalRole,
-    schoolId: roleRow.school_id
+    role: profile.role,
+    schoolId: assignment.school_id
   };
 }
 
