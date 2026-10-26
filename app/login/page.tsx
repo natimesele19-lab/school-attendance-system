@@ -6,7 +6,7 @@ import { Fingerprint, ShieldCheck } from "lucide-react";
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return null;
   return createBrowserClient(url, key);
 }
@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [queryError, setQueryError] = useState<string | null>(null);
-  const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY));
 
   useEffect(() => {
     setQueryError(new URLSearchParams(window.location.search).get("error"));
@@ -27,19 +27,23 @@ export default function LoginPage() {
     event.preventDefault();
     setError("");
     setBusy(true);
-    const supabase = getSupabase();
-    if (!supabase) {
-      setError("Supabase is not configured. Add the required environment variables and restart the app.");
+    try {
+      const supabase = getSupabase();
+      if (!supabase) {
+        setError("Supabase is not configured. Add the required environment variables and restart the app.");
+        return;
+      }
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+      window.location.assign("/");
+    } catch (signInError) {
+      setError(signInError instanceof Error ? signInError.message : "Unable to sign in. Please try again.");
+    } finally {
       setBusy(false);
-      return;
     }
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) {
-      setError(authError.message);
-      setBusy(false);
-      return;
-    }
-    window.location.assign("/");
   }
 
   return (

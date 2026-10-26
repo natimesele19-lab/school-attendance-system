@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPortalContext, isResponse } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -14,30 +15,61 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Request exactly five valid Ethiopian calendar dates." }, { status: 400 });
   }
 
-  const { data: school, error: schoolError } = await context.supabase
-    .from("schools")
-    .select("id, name")
-    .eq("id", context.schoolId)
-    .single();
-  if (schoolError) return NextResponse.json({ error: schoolError.message }, { status: 500 });
+  try {
+    const schoolId = context.schoolId;
+    const [school, staff, records] = await Promise.all([
+      prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { id: true, name: true }
+      }),
+      prisma.staff.findMany({
+        where: { schoolId },
+        select: {
+          id: true,
+          fullName: true,
+          gender: true,
+          jobTitle: true,
+          biometricTemplateHash: true
+        },
+        orderBy: { fullName: "asc" }
+      }),
+      prisma.attendanceRecord.findMany({
+        where: { staff: { schoolId }, date: { in: requestedDates } },
+        select: {
+          id: true,
+          staffId: true,
+          date: true,
+          dayOfWeek: true,
+          checkInTime: true,
+          status: true,
+          signatureVerified: true
+        }
+      })
+    ]);
+    if (!school) return NextResponse.json({ error: "Assigned school was not found." }, { status: 404 });
 
-  const { data: staff, error: staffError } = await context.supabase
-    .from("staff")
-    .select("id, full_name, gender, job_title, biometric_template_hash")
-    .eq("school_id", context.schoolId)
-    .order("full_name");
-  if (staffError) return NextResponse.json({ error: staffError.message }, { status: 500 });
-
-  let records: Record<string, unknown>[] = [];
-  if (staff?.length) {
-    const { data, error: attendanceError } = await context.supabase
-      .from("attendance_records")
-      .select("id, staff_id, date, day_of_week, check_in_time, status, signature_verified")
-      .in("staff_id", staff.map((person) => person.id))
-      .in("date", requestedDates);
-    if (attendanceError) return NextResponse.json({ error: attendanceError.message }, { status: 500 });
-    records = data ?? [];
+    return NextResponse.json({
+      school,
+      staff: staff.map((person) => ({
+        id: person.id,
+        full_name: person.fullName,
+        gender: person.gender,
+        job_title: person.jobTitle,
+        biometric_template_hash: person.biometricTemplateHash
+      })),
+      records: records.map((record) => ({
+        id: record.id,
+        staff_id: record.staffId,
+        date: record.date,
+        day_of_week: record.dayOfWeek,
+        check_in_time: record.checkInTime?.toISOString().slice(11, 19) ?? null,
+        status: record.status,
+        signature_verified: record.signatureVerified
+      })),
+      role: context.role
+    });
+  } catch (error) {
+    console.error("Unable to load school attendance dashboard.", error);
+    return NextResponse.json({ error: "Unable to load school attendance dashboard." }, { status: 500 });
   }
-
-  return NextResponse.json({ school, staff: staff ?? [], records, role: context.role });
 }

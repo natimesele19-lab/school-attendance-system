@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["public"]
+}
+
+enum PortalRole {
+  school_admin
+  portal_admin
+
+  @@map("portal_role")
+  @@schema("public")
+}
+
+model School {
+  id        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String            @db.Text
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  users     UserRole[]
+  staff     Staff[]
+  devices   BiometricDevice[]
+
+  @@map("schools")
+  @@schema("public")
+}
+
+model UserRole {
+  userId    String     @id @map("user_id") @db.Uuid
+  role      PortalRole
+  schoolId  String?    @map("school_id") @db.Uuid
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  school    School?    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("user_roles")
+  @@schema("public")
+}
+
+model Staff {
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId              String             @map("school_id") @db.Uuid
+  fullName              String             @map("full_name") @db.Text
+  gender                String             @db.Text
+  jobTitle              String             @map("job_title") @db.Text
+  biometricTemplateHash String?            @map("biometric_template_hash") @db.Text
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  school                School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  attendanceRecords     AttendanceRecord[]
+
+  @@index([schoolId, fullName], map: "staff_school_name_idx")
+  @@map("staff")
+  @@schema("public")
+}
+
+model AttendanceRecord {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staffId           String    @map("staff_id") @db.Uuid
+  date              String    @db.Text
+  dayOfWeek         String    @map("day_of_week") @db.Text
+  checkInTime       DateTime? @map("check_in_time") @db.Time(6)
+  status            String    @db.Text
+  signatureVerified Boolean   @default(false) @map("signature_verified")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  staff             Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, date])
+  @@index([staffId, date], map: "attendance_records_staff_date_idx")
+  @@map("attendance_records")
+  @@schema("public")
+}
+
+model BiometricDevice {
+  id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId   String             @map("school_id") @db.Uuid
+  deviceName String             @map("device_name") @db.Text
+  status     String             @default("offline") @db.Text
+  lastSeenAt DateTime?          @map("last_seen_at") @db.Timestamptz(6)
+  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  school     School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  logs       ScannerHealthLog[]
+
+  @@map("biometric_devices")
+  @@schema("public")
+}
+
+model ScannerHealthLog {
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deviceId  String          @map("device_id") @db.Uuid
+  level     String          @default("info") @db.Text
+  message   String          @db.Text
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  device    BiometricDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)], map: "scanner_health_logs_created_idx")
+  @@map("scanner_health_logs")
+  @@schema("public")
+}
+
+model SystemStatus {
+  component String   @id @db.Text
+  status    String   @db.Text
+  details   String   @default("") @db.Text
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("system_status")
+  @@schema("public")
+}
+
+model Profile {
+  id        String      @id @db.Uuid
+  email     String      @unique @db.Text
+  role      PortalRole?
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("profiles")
+  @@schema("public")
+}
